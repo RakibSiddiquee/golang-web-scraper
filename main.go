@@ -1,7 +1,7 @@
 package main
 
 import (
-	"encoding/json"
+	"database/sql"
 	"fmt"
 	"github.com/gocolly/colly"
 	"strings"
@@ -18,6 +18,13 @@ type item struct {
 
 func main() {
 	//knownUrls := []string{}
+	//items := scrapeData()
+
+	sql.Open("mysql", "root:@/dbname")
+	fmt.Println(scrapeData())
+}
+
+func scrapeData() []item {
 	items := []item{}
 
 	c := colly.NewCollector(
@@ -82,14 +89,16 @@ func main() {
 	c.Wait()
 	//cc.Wait()
 
+	return items
+
 	// Convert results to JSON data if the scraping job has finished
-	jsonData, err := json.MarshalIndent(items, "", "  ")
-	if err != nil {
-		panic(err)
-	}
+	//jsonData, err := json.MarshalIndent(items, "", "  ")
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	// Dump json to the standard output (can be redirected to a file)
-	fmt.Println(string(jsonData))
+	//fmt.Println(string(jsonData))
 
 	//fmt.Println(titles)
 	//fmt.Println(knownUrls)
