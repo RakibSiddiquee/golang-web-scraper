@@ -3,29 +3,22 @@ package main
 import (
 	"database/sql"
 	"fmt"
-	"github.com/gocolly/colly"
+	"log"
+	"math/rand"
 	"strings"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/gocolly/colly"
 )
 
-type item struct {
-	Title   string `json:"title"`
-	BgImg   string `json:"bgimg"`
-	SmImg   string `json:"smimg"`
-	XsImg   string `json:"xsimg"`
-	Details string `json:"details"`
-}
-
 func main() {
-	//knownUrls := []string{}
-	//items := scrapeData()
 
-	sql.Open("mysql", "root:@/dbname")
-	fmt.Println(scrapeData())
-}
-
-func scrapeData() []item {
-	items := []item{}
+	db, err := sql.Open("mysql", "root:@/dinq")
+	if err != nil {
+		log.Fatalf("Error to connect: %s", err)
+	}
+	defer db.Close()
 
 	c := colly.NewCollector(
 		colly.Async(true),
@@ -36,9 +29,6 @@ func scrapeData() []item {
 
 	c.OnXML("//loc", func(e *colly.XMLElement) {
 		cc.Visit(e.Text)
-		//if e.Response.StatusCode == 200 {
-		//	knownUrls = append(knownUrls, e.Text)
-		//}
 
 	})
 
@@ -56,15 +46,25 @@ func scrapeData() []item {
 		img := strings.Split(h.ChildAttr("meta[property=\"og:image\"]", "content"), "imgPath=")[1]
 		//img := h.ChildAttr("div[class=featured-image] > img", "src")
 		details := h.ChildText("div[class=content-details]")
+		bgPath := "https://cdn.jagonews24.com/media/imgAllNew/BG/" + img
+		smPath := "https://cdn.jagonews24.com/media/imgAllNew/SM/" + img
+		xsPath := "https://cdn.jagonews24.com/media/imgAllNew/XS/" + img
+
+		rand.Seed(time.Now().UnixNano())
+		catId := rand.Intn(10-1) + 1
+
 		if title != "" {
-			item := item{
-				Title:   title,
-				BgImg:   "https://cdn.jagonews24.com/media/imgAllNew/BG/" + img,
-				SmImg:   "https://cdn.jagonews24.com/media/imgAllNew/SM/" + img,
-				XsImg:   "https://cdn.jagonews24.com/media/imgAllNew/XS/" + img,
-				Details: details,
-			}
-			items = append(items, item)
+			stmt, e := db.Prepare("INSERT INTO bn_contents(cat_id, country_id, upozilla_id, content_heading, content_details, img_bg_path, img_sm_path, img_xs_path, uploader_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+			ErrorCheck(e)
+
+			//execute
+			res, e := stmt.Exec(catId, 19, 1, title, details, bgPath, smPath, xsPath, 1, time.Now(), time.Now())
+			ErrorCheck(e)
+
+			id, e := res.LastInsertId()
+			ErrorCheck(e)
+
+			fmt.Println("Insert id", id)
 		}
 
 		//fmt.Println(details)
@@ -76,30 +76,11 @@ func scrapeData() []item {
 
 	c.Visit("https://www.jagonews24.com/sitemaps/news-sitemap.xml")
 
-	//titles := []string{}
-	//for _, link := range knownUrls {
-	//	c.OnHTML("title", func(h *colly.HTMLElement) {
-	//		fmt.Println(h.Text)
-	//		titles = append(titles, h.Text)
-	//	})
-	//
-	//	c.Visit(link)
-	//}
-
 	c.Wait()
-	//cc.Wait()
+}
 
-	return items
-
-	// Convert results to JSON data if the scraping job has finished
-	//jsonData, err := json.MarshalIndent(items, "", "  ")
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	// Dump json to the standard output (can be redirected to a file)
-	//fmt.Println(string(jsonData))
-
-	//fmt.Println(titles)
-	//fmt.Println(knownUrls)
+func ErrorCheck(err error) {
+	if err != nil {
+		panic(err.Error())
+	}
 }
